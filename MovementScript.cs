@@ -7,10 +7,15 @@ using UnityEngine.SceneManagement;
 public class MovementScript : MonoBehaviour {
 
     private GameObject dashEffect;
+    public GameObject snowWalkEffect;
     public GameObject damageTaken;
     public GameObject dashEffectNormal;
     public GameObject dashEffectLightning;
     public GameObject dashEffectFire;
+    public GameObject dashEffectSnow;
+
+    private float walkEffectTimer = 10;
+    private Vector3 walkPlace;
 
     public Text healthDisplay;
     private Rigidbody2D rb;
@@ -32,6 +37,7 @@ public class MovementScript : MonoBehaviour {
      0: No Power Up
      1: Lighting Power Up
      2: Fire Power Up
+     3: Snow Power Up
          */
 
     void Start(){
@@ -42,6 +48,8 @@ public class MovementScript : MonoBehaviour {
 
     // Update is called once per frame
     void Update () {
+        walkPlace = transform.position;
+        walkPlace.y = walkPlace.y - 1.5f;
         healthDisplay.text = "Health: " + playerHealth.ToString();
         Vector3 move = new Vector3(Input.GetAxis("Horizontal"), 0f, 0f);
 
@@ -49,6 +57,7 @@ public class MovementScript : MonoBehaviour {
             Debug.Log("Player Dead!");
             SceneManager.LoadScene("GameOver");
         }
+
 
         switch (powerUp){
             case 0:
@@ -59,6 +68,19 @@ public class MovementScript : MonoBehaviour {
                 break;
             case 2:
                 dashEffect = dashEffectFire;
+                break;
+            case 3:
+                dashEffect = dashEffectSnow;
+                walkEffectTimer--;
+                if (walkEffectTimer <= 0)
+                {
+                    if (isGrounded){
+                        if (move.x != 0){
+                            Instantiate(snowWalkEffect, walkPlace, Quaternion.identity);
+                            walkEffectTimer = 15;
+                        }
+                    }
+                }
                 break;
             default:
                 dashEffect = dashEffectNormal;
@@ -72,18 +94,20 @@ public class MovementScript : MonoBehaviour {
         Destroy(GameObject.Find("DashBurst(Clone)"), 0.35f);
         Destroy(GameObject.Find("ElectricityDashBurst(Clone)"), 0.35f);
         Destroy(GameObject.Find("FireDashBurst(Clone)"), 0.35f);
+        Destroy(GameObject.Find("IceDashBurst(Clone)"), 0.35f);
         Destroy(GameObject.Find("DamageTaken(Clone)"), 0.35f);
+        Destroy(GameObject.Find("snowWalkEffect(Clone)"), 0.35f);
 
         if (Input.GetKeyDown(KeyCode.LeftShift) && dashRestored) {
             //transform.position += move * dashSpeed * Time.deltaTime;
-            if(move.x > 0 && dashActive == false && Input.GetKey(KeyCode.UpArrow)){ //Upright dash
+            if(move.x > 0 && dashActive == false && Input.GetKey(KeyCode.UpArrow) || move.x > 0 && dashActive == false && Input.GetKey(KeyCode.W)){ //Upright dash
                 GetComponent<Animator>().SetBool("isDashing", true);
                 rb.velocity = upRight * upwardDashSpeed;
                 Instantiate(dashEffect, transform.position, Quaternion.identity);
                 dashActive = true;
                 dashRestored = false;
             }
-            if(move.x < 0 && dashActive == false && Input.GetKey(KeyCode.UpArrow)){ //Upleft dash
+            if(move.x < 0 && dashActive == false && Input.GetKey(KeyCode.UpArrow) || move.x < 0 && dashActive == false && Input.GetKey(KeyCode.W)){ //Upleft dash
                 GetComponent<Animator>().SetBool("isDashing", true);
                 rb.velocity = upLeft * upwardDashSpeed;
                 Instantiate(dashEffect, transform.position, Quaternion.identity);
@@ -158,25 +182,41 @@ public class MovementScript : MonoBehaviour {
             powerUp = 2;
             Destroy(collision.gameObject);
         }
+        if (collision.gameObject.CompareTag("Snow")){
+            Debug.Log("Freeze!");
+            powerUp = 3;
+            Destroy(collision.gameObject);
+        }
 
         //Enemy Detection
         if (collision.gameObject.CompareTag("enemy")){
-            if(powerUp == 1 && dashActive){
+            if (powerUp == 1 && dashActive){
                 Debug.Log("Enemy Dead! " + dashActive);
                 Destroy(collision.gameObject);
                 Instantiate(dashEffect, transform.position, Quaternion.identity);
-            } else if(powerUp == 2 && dashActive){
+            }else if (powerUp == 2 && dashActive){
                 Debug.Log("Enemy hit!" + dashActive);
                 EnemyMovement.health--;
                 Debug.Log(EnemyMovement.health);
-            }
-            else{
+            }else if (powerUp == 3 && dashActive){
+                Debug.Log("Enemy Frozen!" + dashActive);
+                collision.gameObject.tag = "Frozen";
+
+            }else{
                 Debug.Log("Player Hit!");
-                playerHealth-= 20;
+                playerHealth -= 20;
                 Instantiate(damageTaken, transform.position, Quaternion.identity);
             }
          }
+        //Frozen Enemy Detection
+        if (collision.gameObject.CompareTag("Frozen")){
+            if (dashActive && powerUp != 3){
+                Instantiate(damageTaken, collision.gameObject.transform.position, Quaternion.identity);
+                Destroy(collision.gameObject);
+            }
         }
+        }
+
     void OnTriggerEnter2D(){
         isGrounded = true;
     }
